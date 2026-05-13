@@ -1,0 +1,49 @@
+{
+  "name": "TaskAPI DevOps Environment",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "dockerDashComposeVersion": "v2"
+    },
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+      "version": "latest",
+      "minikube": "none",
+      "helm": "latest"
+    },
+    "ghcr.io/mpriscella/features/kind:1": {
+      "version": "latest"
+    }
+  },
+  "onCreateCommand": "bash .devcontainer/setup.sh",
+  "forwardPorts": [
+    8080,
+    8200,
+    9090,
+    3000,
+    3100
+  ],
+  "portsAttributes": {
+    "8080": { "label": "TaskAPI", "onAutoForward": "notify" },
+    "8200": { "label": "Vault UI", "onAutoForward": "notify" },
+    "9090": { "label": "Prometheus", "onAutoForward": "notify" },
+    "3000": { "label": "Grafana", "onAutoForward": "notify" },
+    "3100": { "label": "Loki", "onAutoForward": "silent" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "ms-azuretools.vscode-docker",
+        "hashicorp.terraform",
+        "redhat.vscode-yaml",
+        "GitHub.vscode-github-actions",
+        "eamodio.gitlens",
+        "rangav.vscode-thunder-client"
+      ]
+    }
+  },
+  "remoteEnv": {
+    "KUBECONFIG": "/home/vscode/.kube/config"
+  }
+}
