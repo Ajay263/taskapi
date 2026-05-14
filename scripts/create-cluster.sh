@@ -1,28 +1,24 @@
 #!/bin/bash
 set -e
 
-CLUSTER_NAME="taskapi-local"
-
 echo "=========================================="
-echo "  Creating KinD Cluster: $CLUSTER_NAME"
+echo "  Creating KinD Cluster"
 echo "=========================================="
 
-# KinD cluster config
+# Check if Docker is running
+if ! docker info > /dev/null 2>&1; then
+  echo "❌ Docker is not running. Please start Docker first."
+  exit 1
+fi
+
+# Create cluster config
 cat > /tmp/kind-config.yaml <<EOF
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
-name: ${CLUSTER_NAME}
+name: taskapi
 nodes:
-  # Control plane node
   - role: control-plane
-    kubeadmConfigPatches:
-    - |
-      kind: InitConfiguration
-      nodeRegistration:
-        kubeletExtraArgs:
-          node-labels: "ingress-ready=true"
     extraPortMappings:
-    # Map host ports → container ports for NodePort services
     - containerPort: 30080
       hostPort: 8080
       protocol: TCP
@@ -30,54 +26,26 @@ nodes:
       hostPort: 8443
       protocol: TCP
     - containerPort: 30090
-      hostPort: 9090    # Prometheus
+      hostPort: 9090
       protocol: TCP
     - containerPort: 30030
-      hostPort: 3000    # Grafana
+      hostPort: 3000
       protocol: TCP
-    - containerPort: 30200
-      hostPort: 8200    # Vault
-      protocol: TCP
-  # Worker node 1 (simulates app workloads)
   - role: worker
-    labels:
-      workload: app
-  # Worker node 2 (simulates infra/monitoring workloads)
   - role: worker
-    labels:
-      workload: infra
-
-# Networking
-networking:
-  podSubnet: "10.244.0.0/16"
-  serviceSubnet: "10.96.0.0/12"
-  disableDefaultCNI: false  # Use kindnet
 EOF
 
-# Check if cluster already exists
-if kind get clusters | grep -q "^${CLUSTER_NAME}$"; then
-  echo "Cluster '${CLUSTER_NAME}' already exists. Skipping creation."
+# Create cluster
+if kind get clusters | grep -q "^taskapi$"; then
+  echo "→ Cluster 'taskapi' already exists. Skipping creation."
 else
-  echo "→ Creating cluster (this takes 2-3 minutes)..."
+  echo "→ Creating cluster (takes 2-3 minutes)..."
   kind create cluster --config /tmp/kind-config.yaml --wait 300s
 fi
 
 echo ""
-echo "→ Cluster created! Nodes:"
-kubectl get nodes -o wide
+echo "→ Cluster nodes:"
+kubectl get nodes
 
 echo ""
-echo "→ Installing NGINX Ingress Controller..."
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
-kubectl wait --namespace ingress-nginx \
-  --for=condition=ready pod \
-  --selector=app.kubernetes.io/component=controller \
-  --timeout=90s
-
-echo ""
-echo "✅ Cluster ready!"
-echo ""
-echo "Next steps:"
-echo "  1. Run: bash scripts/install-vault.sh"
-echo "  2. Run: bash scripts/install-argocd.sh"
-echo "  3. Run: bash scripts/install-monitoring.sh"
+echo "✅ KinD cluster is ready!"

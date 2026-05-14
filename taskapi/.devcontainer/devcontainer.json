@@ -1,6 +1,7 @@
 {
   "name": "TaskAPI DevOps Environment",
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
       "version": "latest",
@@ -13,36 +14,40 @@
     },
     "ghcr.io/mpriscella/features/kind:1": {
       "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11"
     }
   },
+
   "onCreateCommand": "bash .devcontainer/setup.sh",
-  "forwardPorts": [
-    8080,
-    8200,
-    9090,
-    3000,
-    3100
-  ],
+
+  "forwardPorts": [8000, 8080, 8200, 8443, 9090, 3000, 3100, 16686],
   "portsAttributes": {
-    "8080": { "label": "TaskAPI", "onAutoForward": "notify" },
-    "8200": { "label": "Vault UI", "onAutoForward": "notify" },
-    "9090": { "label": "Prometheus", "onAutoForward": "notify" },
-    "3000": { "label": "Grafana", "onAutoForward": "notify" },
-    "3100": { "label": "Loki", "onAutoForward": "silent" }
+    "8000":  { "label": "TaskAPI — local Python",   "onAutoForward": "notify" },
+    "8080":  { "label": "TaskAPI — Kubernetes",     "onAutoForward": "notify" },
+    "8200":  { "label": "Vault UI",                 "onAutoForward": "notify" },
+    "8443":  { "label": "ArgoCD UI",                "onAutoForward": "notify" },
+    "9090":  { "label": "Prometheus",               "onAutoForward": "notify" },
+    "3000":  { "label": "Grafana",                  "onAutoForward": "notify" },
+    "3100":  { "label": "Loki",                     "onAutoForward": "silent"  },
+    "16686": { "label": "Jaeger Tracing",           "onAutoForward": "notify" }
   },
+
   "customizations": {
     "vscode": {
       "extensions": [
         "ms-kubernetes-tools.vscode-kubernetes-tools",
         "ms-azuretools.vscode-docker",
-        "hashicorp.terraform",
         "redhat.vscode-yaml",
         "GitHub.vscode-github-actions",
         "eamodio.gitlens",
-        "rangav.vscode-thunder-client"
+        "rangav.vscode-thunder-client",
+        "ms-python.python"
       ]
     }
   },
+
   "remoteEnv": {
     "KUBECONFIG": "/home/vscode/.kube/config"
   }
