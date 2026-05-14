@@ -88,6 +88,7 @@ jobs:
       contents: read
       packages: write
       security-events: write
+      id-token: write  
 
     outputs:
       image-tag: ${{ steps.meta.outputs.version }}
@@ -104,6 +105,10 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lowercase image name
+        run: |
+          echo "IMAGE_NAME=$(echo ${{ github.repository_owner }}/taskapi | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Generate image metadata
         id: meta
