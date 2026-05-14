@@ -28,7 +28,8 @@ check_tool "argocd"    "argocd version --client 2>/dev/null | head -1 | awk '{pr
 check_tool "vault"     "vault version | awk '{print \$2}'"
 check_tool "istioctl"  "istioctl version --remote=false 2>/dev/null | head -1"
 check_tool "trivy"     "trivy --version | head -1 | awk '{print \$2}'"
-check_tool "yq"        "yq --version | awk '{print \$4}'"
+# yq v4 format: "yq (https://github.com/mikefarah/yq/) version v4.x.x"  → field 4
+check_tool "yq"        "yq --version 2>/dev/null | awk '{print \$NF}'"
 check_tool "python3"   "python3 --version | awk '{print \$2}'"
 check_tool "pip"       "pip --version | awk '{print \$2}'"
 check_tool "git"       "git --version | awk '{print \$3}'"
