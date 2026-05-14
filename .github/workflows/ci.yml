@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/taskapi
+  IMAGE_NAME: ajay263/taskapi    # ← lowercase — GHCR requires this
 
 jobs:
   test:
@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: taskapi   # All run steps execute inside taskapi/
+        working-directory: taskapi
 
     steps:
       - name: Checkout code
@@ -118,7 +118,7 @@ jobs:
       - name: Build image (local only, not pushed)
         uses: docker/build-push-action@v5
         with:
-          context: taskapi   # ← Dockerfile is inside taskapi/ subfolder
+          context: taskapi
           load: true
           push: false
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:scan-target
@@ -147,13 +147,14 @@ jobs:
         with:
           sarif_file: trivy-image.sarif
           category: container-scan
+        continue-on-error: true
 
       - name: Push image to GHCR
         id: push
         uses: docker/build-push-action@v5
         if: github.ref == 'refs/heads/main'
         with:
-          context: taskapi   # ← Dockerfile is inside taskapi/ subfolder
+          context: taskapi
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
