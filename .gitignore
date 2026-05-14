@@ -1,7 +1,7 @@
 # Git and dev tooling
 .git
-.github
-.devcontainer
+
+
 .vscode
 
 # Python cache — match both root and inside app/
