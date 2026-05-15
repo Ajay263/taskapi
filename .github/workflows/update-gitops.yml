@@ -31,7 +31,7 @@ jobs:
         working-directory: gitops/taskapi-gitops/overlays/dev
         run: |
           NEW_TAG="sha-$(echo ${{ github.event.workflow_run.head_sha }} | cut -c1-7)"
-          kustomize edit set image taskapi=ghcr.io/${{ env.IMAGE_NAME }}:${NEW_TAG}
+          kustomize edit set image ghcr.io/${{ env.IMAGE_NAME }}=ghcr.io/${{ env.IMAGE_NAME }}:${NEW_TAG}
           echo "Updated dev overlay to image tag: ${NEW_TAG}"
 
       - name: Commit and push to GitOps repo
