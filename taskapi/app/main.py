@@ -24,6 +24,17 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
+# ── OpenTelemetry imports ─────────────────────────────────────────────────────
+# These are already in requirements.txt.
+# If OTEL_EXPORTER_OTLP_ENDPOINT is not set, tracing is silently disabled.
+# Your app behaves identically — tracing is purely additive.
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
 # ── Structured JSON Logging ───────────────────────────────────────────────────
 #
 # Why JSON logging?
@@ -80,6 +91,56 @@ TASKS_CREATED = Counter(
     "Total number of tasks created",
 )
 
+# ── OpenTelemetry Tracing Setup ───────────────────────────────────────────────
+#
+# OpenTelemetry (OTel) is the industry-standard, vendor-neutral tracing API.
+# It works with Jaeger, Zipkin, Datadog, Honeycomb, and any backend.
+#
+# How it works:
+#   1. setup_tracing() runs at startup and configures the OTel SDK
+#   2. FastAPIInstrumentor (called after app = FastAPI()) patches every route
+#   3. Each HTTP request automatically gets a trace span with method, path,
+#      status code, and duration — no manual instrumentation needed
+#   4. Spans are batched and sent to Jaeger via OTLP gRPC protocol
+#
+# The OTEL_EXPORTER_OTLP_ENDPOINT env var controls the destination.
+# If not set → tracing is disabled. App works exactly the same without it.
+# In Kubernetes: http://jaeger-collector.observability.svc.cluster.local:4317
+#
+def setup_tracing() -> bool:
+    """
+    Configure OpenTelemetry to export traces to Jaeger.
+    Returns True if tracing was enabled, False if endpoint not configured.
+    """
+    endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+    if not endpoint:
+        return False
+
+    # Resource describes this service to Jaeger
+    # These appear as tags on every trace in the Jaeger UI
+    resource = Resource.create({
+        "service.name":            "taskapi",
+        "service.version":         os.getenv("APP_VERSION", "dev"),
+        "deployment.environment":  os.getenv("ENVIRONMENT", "local"),
+    })
+
+    # TracerProvider is the OTel SDK's core — it manages span creation
+    provider = TracerProvider(resource=resource)
+
+    # OTLPSpanExporter sends spans to Jaeger over gRPC
+    # insecure=True: no TLS (acceptable for cluster-internal traffic)
+    exporter = OTLPSpanExporter(endpoint=endpoint, insecure=True)
+
+    # BatchSpanProcessor buffers spans and sends them in batches
+    # More efficient than sending each span individually
+    provider.add_span_processor(BatchSpanProcessor(exporter))
+
+    # Register as the global tracer provider
+    trace.set_tracer_provider(provider)
+    return True
+
+_tracing_enabled = setup_tracing()
+
 # ── Pydantic Models ───────────────────────────────────────────────────────────
 # These define the shape of request bodies and response bodies.
 # FastAPI validates every request against these models automatically.
@@ -116,13 +177,23 @@ app = FastAPI(
     redoc_url="/redoc",  # Alternative documentation UI
 )
 
-# In-memory storage — in production this would be a database
+# ── Instrument FastAPI with OpenTelemetry ─────────────────────────────────────
+# MUST be called AFTER app = FastAPI(...) is created.
+# FastAPIInstrumentor patches FastAPI's routing layer so every HTTP request
+# automatically creates a trace span — no changes to route handlers needed.
+if _tracing_enabled:
+    FastAPIInstrumentor.instrument_app(app)
+    logger.info("OpenTelemetry tracing enabled → sending to Jaeger")
+else:
+    logger.info("OpenTelemetry tracing disabled (OTEL_EXPORTER_OTLP_ENDPOINT not set)")
+
+# ── In-memory storage ─────────────────────────────────────────────────────────
+# In production this would be a database (PostgreSQL, MongoDB, etc.)
 _tasks: dict[int, dict] = {}
 _next_id: int = 0
 
 # Read the database password from environment.
-# Phase 7 (Vault) will inject the real value.
-# For now, warn if it is not set.
+# Phase 7 (Vault) injects the real value via External Secrets Operator.
 DB_PASSWORD = os.getenv("DB_PASSWORD", "NOT_CONFIGURED")
 if DB_PASSWORD == "NOT_CONFIGURED":
     logger.warning("DB_PASSWORD env var not set — expected when Vault is not yet configured")
@@ -170,6 +241,7 @@ def health_check():
         "environment": os.getenv("ENVIRONMENT", "local"),
         "checks": {
             "vault_secret": "ok" if vault_ok else "missing — expected until Phase 7",
+            "tracing": "enabled" if _tracing_enabled else "disabled",
         },
     }
 
